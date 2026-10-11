@@ -1,7 +1,129 @@
-from fastapi import FastAPI
+import sqlite3
+from datetime import datetime
+from typing import Optional
 
-app = FastAPI()
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+app = FastAPI(title="Civic Issue API")
+
+# Allows the HTML pages to call this backend from the browser
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+DB_FILE = "issues.db"
+
+CATEGORIES = [
+    "road_damage",
+    "water_drainage",
+    "electricity",
+    "sanitation",
+    "mosquito_breeding",
+    "streetlight",
+]
+STATUSES = ["reported", "assigned", "resolved"]
+
+
+def get_connection():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    conn = get_connection()
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS issues (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            description TEXT,
+            urgency TEXT DEFAULT 'medium',
+            latitude REAL,
+            longitude REAL,
+            status TEXT DEFAULT 'reported',
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
+init_db()
+
+
+class IssueCreate(BaseModel):
+    category: str
+    description: str = ""
+    urgency: str = "medium"
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class StatusUpdate(BaseModel):
+    status: str
+
 
 @app.get("/")
 def home():
     return {"status": "ok", "message": "Civic Issue backend running"}
+
+
+@app.post("/issues")
+def create_issue(issue: IssueCreate):
+    if issue.category not in CATEGORIES:
+        raise HTTPException(status_code=400, detail=f"category must be one of {CATEGORIES}")
+    conn = get_connection()
+    cursor = conn.execute(
+        "INSERT INTO issues (category, description, urgency, latitude, longitude, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            issue.category,
+            issue.description,
+            issue.urgency,
+            issue.latitude,
+            issue.longitude,
+            datetime.now().isoformat(),
+        ),
+    )
+    conn.commit()
+    new_id = cursor.lastrowid
+    conn.close()
+    return {"id": new_id, "message": "Issue reported", "status": "reported"}
+
+
+@app.get("/issues")
+def list_issues():
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM issues ORDER BY id DESC").fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+@app.get("/issues/{issue_id}")
+def get_issue(issue_id: int):
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM issues WHERE id = ?", (issue_id,)).fetchone()
+    conn.close()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    return dict(row)
+
+
+@app.patch("/issues/{issue_id}/status")
+def update_status(issue_id: int, update: StatusUpdate):
+    if update.status not in STATUSES:
+        raise HTTPException(status_code=400, detail=f"status must be one of {STATUSES}")
+    conn = get_connection()
+    cursor = conn.execute("UPDATE issues SET status = ? WHERE id = ?", (update.status, issue_id))
+    conn.commit()
+    conn.close()
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    return {"id": issue_id, "status": update.status}
