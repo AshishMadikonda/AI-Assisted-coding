@@ -1,10 +1,19 @@
+import os
+import shutil
 import sqlite3
+import sys
+import tempfile
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# Lets this file import code from the /ai folder at the project root
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(ROOT_DIR)
+from ai.classify import classify_issue  # noqa: E402
 
 app = FastAPI(title="Civic Issue API")
 
@@ -73,6 +82,29 @@ class StatusUpdate(BaseModel):
 @app.get("/")
 def home():
     return {"status": "ok", "message": "Civic Issue backend running"}
+
+
+@app.post("/classify")
+def classify_photo(photo: UploadFile = File(...)):
+    suffix = os.path.splitext(photo.filename or "")[1].lower()
+    if suffix not in (".jpg", ".jpeg", ".png"):
+        raise HTTPException(status_code=400, detail="Upload a .jpg, .jpeg or .png photo")
+
+    # Save the upload to a temporary file so classify_issue can read it
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        shutil.copyfileobj(photo.file, tmp)
+        tmp_path = tmp.name
+
+    try:
+        return classify_issue(tmp_path)
+    except Exception as error:
+        print(f"classify error: {error}")
+        raise HTTPException(
+            status_code=502,
+            detail="AI classification failed. Check the backend terminal for details.",
+        )
+    finally:
+        os.remove(tmp_path)
 
 
 @app.post("/issues")
