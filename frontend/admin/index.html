@@ -1,12 +1,283 @@
 <!DOCTYPE html>
-<html>
-<head><title>Admin Dashboard</title></head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #f4f1ea;
+      color: #20291f;
+    }
+    main { max-width: 1100px; margin: 0 auto; padding: 32px 20px 60px; }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    .sub { margin: 0 0 24px; color: #5c6656; }
+    button {
+      font: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 14px;
+    }
+    #refreshBtn { background: #20291f; color: #fff; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat {
+      background: #fff;
+      border: 1px solid #d9d3c2;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .stat .num { font-size: 30px; font-weight: 700; }
+    .stat .label { font-size: 13px; color: #5c6656; }
+    .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    select {
+      font: inherit;
+      padding: 8px 10px;
+      border: 1px solid #c9bfa3;
+      border-radius: 6px;
+      background: #fff;
+    }
+    #message { min-height: 20px; margin: 0 0 8px; color: #2f6e5b; }
+    #message.error { color: #a8412b; font-weight: 600; }
+    .tablewrap {
+      overflow-x: auto;
+      background: #fff;
+      border: 1px solid #d9d3c2;
+      border-radius: 10px;
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 820px; }
+    th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid #ece7d9; font-size: 14px; vertical-align: top; }
+    th { background: #f0ece0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #5c6656; }
+    tr:last-child td { border-bottom: none; }
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .urgency-high { background: #f3d9d2; color: #a8412b; }
+    .urgency-medium { background: #f6e6c6; color: #8a5a0c; }
+    .urgency-low { background: #dcebe5; color: #1f4b3e; }
+    .status-reported { background: #f3d9d2; color: #a8412b; }
+    .status-assigned { background: #f6e6c6; color: #8a5a0c; }
+    .status-resolved { background: #dcebe5; color: #1f4b3e; }
+    .actions button { margin-right: 6px; }
+    .assign { background: #db9021; color: #fff; }
+    .resolve { background: #2f6e5b; color: #fff; }
+    .empty { text-align: center; color: #5c6656; padding: 28px; }
+    a { color: #2f6e5b; }
+    @media (max-width: 700px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
 <body>
-  <h1>Reported Issues</h1>
-  <table border="1">
-    <tr><th>Category</th><th>Status</th><th>Action</th></tr>
-    <tr><td>Road Damage</td><td>Pending</td><td>Assign</td></tr>
-    <tr><td>Water Leak</td><td>Resolved</td><td>-</td></tr>
-  </table>
+  <main>
+    <div class="top">
+      <div>
+        <h1>Admin Dashboard</h1>
+        <p class="sub">Reported civic issues. Assign them and mark them resolved.</p>
+      </div>
+      <button id="refreshBtn">Refresh</button>
+    </div>
+
+    <section class="stats">
+      <div class="stat"><div class="num" id="countTotal">0</div><div class="label">Total issues</div></div>
+      <div class="stat"><div class="num" id="countReported">0</div><div class="label">Reported</div></div>
+      <div class="stat"><div class="num" id="countAssigned">0</div><div class="label">Assigned</div></div>
+      <div class="stat"><div class="num" id="countResolved">0</div><div class="label">Resolved</div></div>
+    </section>
+
+    <div class="toolbar">
+      <label for="statusFilter">Show</label>
+      <select id="statusFilter">
+        <option value="all">All issues</option>
+        <option value="reported">Reported</option>
+        <option value="assigned">Assigned</option>
+        <option value="resolved">Resolved</option>
+      </select>
+    </div>
+
+    <p id="message"></p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Urgency</th>
+            <th>Status</th>
+            <th>Location</th>
+            <th>Reported</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="issueRows"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script>
+    const API = "http://127.0.0.1:8000";
+
+    const CATEGORY_LABELS = {
+      road_damage: "Road damage",
+      water_drainage: "Water and drainage",
+      electricity: "Electricity",
+      sanitation: "Sanitation",
+      mosquito_breeding: "Mosquito breeding",
+      streetlight: "Streetlight",
+    };
+
+    const rows = document.getElementById("issueRows");
+    const message = document.getElementById("message");
+    const statusFilter = document.getElementById("statusFilter");
+    const refreshBtn = document.getElementById("refreshBtn");
+
+    let issues = [];
+
+    function setMessage(text, isError) {
+      message.textContent = text;
+      message.className = isError ? "error" : "";
+    }
+
+    function makeCell(text) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      return td;
+    }
+
+    function makeBadgeCell(kind, value) {
+      const td = document.createElement("td");
+      const span = document.createElement("span");
+      span.className = "badge " + kind + "-" + value;
+      span.textContent = value;
+      td.appendChild(span);
+      return td;
+    }
+
+    function makeLocationCell(issue) {
+      const td = document.createElement("td");
+      if (issue.latitude !== null && issue.longitude !== null) {
+        const link = document.createElement("a");
+        link.href =
+          "https://www.openstreetmap.org/?mlat=" + issue.latitude +
+          "&mlon=" + issue.longitude +
+          "#map=17/" + issue.latitude + "/" + issue.longitude;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = "View on map";
+        td.appendChild(link);
+      } else {
+        td.textContent = "Not shared";
+      }
+      return td;
+    }
+
+    function makeActionCell(issue) {
+      const td = document.createElement("td");
+      td.className = "actions";
+      if (issue.status === "reported") {
+        const assignBtn = document.createElement("button");
+        assignBtn.className = "assign";
+        assignBtn.textContent = "Assign";
+        assignBtn.addEventListener("click", () => updateStatus(issue.id, "assigned"));
+        td.appendChild(assignBtn);
+      }
+      if (issue.status !== "resolved") {
+        const resolveBtn = document.createElement("button");
+        resolveBtn.className = "resolve";
+        resolveBtn.textContent = "Resolve";
+        resolveBtn.addEventListener("click", () => updateStatus(issue.id, "resolved"));
+        td.appendChild(resolveBtn);
+      } else {
+        td.textContent = "Done";
+      }
+      return td;
+    }
+
+    function updateCounts() {
+      const count = (status) => issues.filter((i) => i.status === status).length;
+      document.getElementById("countTotal").textContent = issues.length;
+      document.getElementById("countReported").textContent = count("reported");
+      document.getElementById("countAssigned").textContent = count("assigned");
+      document.getElementById("countResolved").textContent = count("resolved");
+    }
+
+    function render() {
+      updateCounts();
+      rows.innerHTML = "";
+
+      const filter = statusFilter.value;
+      const visible = issues.filter((i) => filter === "all" || i.status === filter);
+
+      if (visible.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 8;
+        td.className = "empty";
+        td.textContent = "No issues to show.";
+        tr.appendChild(td);
+        rows.appendChild(tr);
+        return;
+      }
+
+      visible.forEach((issue) => {
+        const tr = document.createElement("tr");
+        tr.appendChild(makeCell("#" + issue.id));
+        tr.appendChild(makeCell(CATEGORY_LABELS[issue.category] || issue.category));
+        tr.appendChild(makeCell(issue.description || "-"));
+        tr.appendChild(makeBadgeCell("urgency", issue.urgency));
+        tr.appendChild(makeBadgeCell("status", issue.status));
+        tr.appendChild(makeLocationCell(issue));
+        tr.appendChild(makeCell(new Date(issue.created_at).toLocaleString()));
+        tr.appendChild(makeActionCell(issue));
+        rows.appendChild(tr);
+      });
+    }
+
+    async function loadIssues() {
+      setMessage("Loading issues...", false);
+      try {
+        const response = await fetch(API + "/issues");
+        if (!response.ok) throw new Error("load failed");
+        issues = await response.json();
+        setMessage("", false);
+      } catch (error) {
+        issues = [];
+        setMessage("Could not load issues. Check that the backend is running.", true);
+      }
+      render();
+    }
+
+    async function updateStatus(id, status) {
+      try {
+        const response = await fetch(API + "/issues/" + id + "/status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: status }),
+        });
+        if (!response.ok) throw new Error("update failed");
+        await loadIssues();
+      } catch (error) {
+        setMessage("Could not update the status. Check that the backend is running.", true);
+      }
+    }
+
+    refreshBtn.addEventListener("click", loadIssues);
+    statusFilter.addEventListener("change", render);
+    loadIssues();
+  </script>
 </body>
 </html>
