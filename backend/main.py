@@ -66,10 +66,15 @@ def init_db():
             latitude REAL,
             longitude REAL,
             status TEXT DEFAULT 'reported',
+            resolution_note TEXT,
             created_at TEXT NOT NULL
         )
         """
     )
+    # Databases created before this step do not have the note column yet, so add it
+    columns = [row["name"] for row in conn.execute("PRAGMA table_info(issues)").fetchall()]
+    if "resolution_note" not in columns:
+        conn.execute("ALTER TABLE issues ADD COLUMN resolution_note TEXT")
     conn.commit()
     conn.close()
 
@@ -93,6 +98,7 @@ class IssueCreate(BaseModel):
 
 class StatusUpdate(BaseModel):
     status: str
+    note: Optional[str] = None
 
 
 @app.get("/")
@@ -179,9 +185,17 @@ def update_status(issue_id: int, update: StatusUpdate):
     if update.status not in STATUSES:
         raise HTTPException(status_code=400, detail=f"status must be one of {STATUSES}")
     conn = get_connection()
-    cursor = conn.execute("UPDATE issues SET status = ? WHERE id = ?", (update.status, issue_id))
+    if update.note is not None:
+        cursor = conn.execute(
+            "UPDATE issues SET status = ?, resolution_note = ? WHERE id = ?",
+            (update.status, update.note, issue_id),
+        )
+    else:
+        cursor = conn.execute(
+            "UPDATE issues SET status = ? WHERE id = ?", (update.status, issue_id)
+        )
     conn.commit()
     conn.close()
     if cursor.rowcount == 0:
         raise HTTPException(status_code=404, detail="Issue not found")
-    return {"id": issue_id, "status": update.status}
+    return {"id": issue_id, "status": update.status, "note": update.note}
