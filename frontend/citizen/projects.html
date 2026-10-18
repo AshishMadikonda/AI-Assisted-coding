@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Projects in Your Area</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #f4f1ea;
+      color: #20291f;
+    }
+    main { max-width: 1000px; margin: 0 auto; padding: 32px 20px 60px; }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    .sub { margin: 0 0 22px; color: #5c6656; }
+    .bar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    select {
+      font: inherit;
+      padding: 8px 10px;
+      border: 1px solid #c9bfa3;
+      border-radius: 6px;
+      background: #fff;
+    }
+    button {
+      font: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 14px;
+      background: #20291f;
+      color: #fff;
+    }
+    #message { min-height: 20px; margin: 0 0 10px; color: #2f6e5b; }
+    #message.error { color: #a8412b; font-weight: 600; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+    .card {
+      background: #fff;
+      border: 1px solid #d9d3c2;
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .card h2 { margin: 8px 0 10px; font-size: 18px; }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-planned { background: #f6e6c6; color: #8a5a0c; }
+    .status-ongoing { background: #dcebe5; color: #1f4b3e; }
+    .status-completed { background: #e4e4e4; color: #444444; }
+    .line { font-size: 14px; margin: 4px 0; color: #3d463a; }
+    .line span { color: #5c6656; }
+    .desc { margin-top: 10px; font-size: 14px; color: #3d463a; }
+    .links { margin-top: 24px; }
+    a { color: #2f6e5b; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Projects in Your Area</h1>
+    <p class="sub">Ongoing and upcoming public works, so you can see what is already planned before you report.</p>
+
+    <div class="bar">
+      <label for="statusFilter">Show</label>
+      <select id="statusFilter">
+        <option value="all">All projects</option>
+        <option value="ongoing">Ongoing</option>
+        <option value="planned">Planned</option>
+        <option value="completed">Completed</option>
+      </select>
+      <button id="refreshBtn">Refresh</button>
+    </div>
+
+    <p id="message"></p>
+    <div id="grid" class="grid"></div>
+
+    <p class="links">
+      <a href="index.html">Report an issue</a> &middot;
+      <a href="track.html">Track a report</a> &middot;
+      <a href="map.html">Issue map</a>
+    </p>
+  </main>
+
+  <script>
+    const API = "http://127.0.0.1:8000";
+    const STATUS_LABELS = { planned: "Planned", ongoing: "Ongoing", completed: "Completed" };
+
+    const grid = document.getElementById("grid");
+    const message = document.getElementById("message");
+    const statusFilter = document.getElementById("statusFilter");
+    const refreshBtn = document.getElementById("refreshBtn");
+
+    let projects = [];
+
+    function setMessage(text, isError) {
+      message.textContent = text;
+      message.className = isError ? "error" : "";
+    }
+
+    function formatDate(value) {
+      if (!value) return "Not set";
+      const date = new Date(value + "T00:00:00");
+      return isNaN(date) ? value : date.toLocaleDateString();
+    }
+
+    function addLine(parent, label, value) {
+      const line = document.createElement("div");
+      line.className = "line";
+      const name = document.createElement("span");
+      name.textContent = label + ": ";
+      line.appendChild(name);
+      line.appendChild(document.createTextNode(value));
+      parent.appendChild(line);
+    }
+
+    function render() {
+      grid.innerHTML = "";
+      const filter = statusFilter.value;
+      const visible = projects.filter((p) => filter === "all" || p.status === filter);
+
+      if (visible.length === 0) {
+        setMessage("No projects to show.", false);
+        return;
+      }
+      setMessage("", false);
+
+      visible.forEach((project) => {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        const badge = document.createElement("span");
+        badge.className = "badge status-" + project.status;
+        badge.textContent = STATUS_LABELS[project.status] || project.status;
+        card.appendChild(badge);
+
+        const title = document.createElement("h2");
+        title.textContent = project.title;
+        card.appendChild(title);
+
+        addLine(card, "Department", project.department || "-");
+        addLine(card, "Area", project.area || "-");
+        addLine(card, "Start", formatDate(project.start_date));
+        addLine(card, "Expected finish", formatDate(project.expected_end_date));
+
+        if (project.description) {
+          const desc = document.createElement("div");
+          desc.className = "desc";
+          desc.textContent = project.description;
+          card.appendChild(desc);
+        }
+        grid.appendChild(card);
+      });
+    }
+
+    async function loadProjects() {
+      setMessage("Loading...", false);
+      try {
+        const response = await fetch(API + "/projects");
+        if (!response.ok) throw new Error("load failed");
+        projects = await response.json();
+      } catch (error) {
+        projects = [];
+        grid.innerHTML = "";
+        setMessage("Could not load projects. Check that the backend is running.", true);
+        return;
+      }
+      render();
+    }
+
+    refreshBtn.addEventListener("click", loadProjects);
+    statusFilter.addEventListener("change", render);
+    loadProjects();
+  </script>
+</body>
+</html>
