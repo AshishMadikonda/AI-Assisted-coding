@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Issue Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #f4f1ea;
+      color: #20291f;
+    }
+    main { max-width: 1100px; margin: 0 auto; padding: 28px 20px 50px; }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    .sub { margin: 0 0 18px; color: #5c6656; }
+    .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 10px; }
+    select {
+      font: inherit;
+      padding: 8px 10px;
+      border: 1px solid #c9bfa3;
+      border-radius: 6px;
+      background: #fff;
+    }
+    button {
+      font: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 14px;
+      background: #20291f;
+      color: #fff;
+    }
+    .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; margin-left: auto; }
+    .dot {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    #message { min-height: 20px; margin: 0 0 10px; color: #2f6e5b; }
+    #message.error { color: #a8412b; font-weight: 600; }
+    #map { height: 520px; border: 1px solid #d9d3c2; border-radius: 10px; }
+    .links { margin-top: 18px; }
+    a { color: #2f6e5b; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Issue Map</h1>
+    <p class="sub">Every reported issue that shared a location.</p>
+
+    <div class="bar">
+      <label for="statusFilter">Show</label>
+      <select id="statusFilter">
+        <option value="all">All issues</option>
+        <option value="reported">Reported</option>
+        <option value="assigned">Assigned</option>
+        <option value="resolved">Resolved</option>
+      </select>
+      <button id="refreshBtn">Refresh</button>
+      <div class="legend">
+        <span><span class="dot" style="background:#a8412b"></span>Reported</span>
+        <span><span class="dot" style="background:#db9021"></span>Assigned</span>
+        <span><span class="dot" style="background:#2f6e5b"></span>Resolved</span>
+      </div>
+    </div>
+
+    <p id="message"></p>
+    <div id="map"></div>
+
+    <p class="links">
+      <a href="index.html">Report an issue</a> &middot; <a href="track.html">Track a report</a>
+    </p>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const API = "http://127.0.0.1:8000";
+    const COLORS = { reported: "#a8412b", assigned: "#db9021", resolved: "#2f6e5b" };
+    const CATEGORY_LABELS = {
+      road_damage: "Road damage",
+      water_drainage: "Water and drainage",
+      electricity: "Electricity",
+      sanitation: "Sanitation",
+      mosquito_breeding: "Mosquito breeding",
+      streetlight: "Streetlight",
+    };
+
+    const message = document.getElementById("message");
+    const statusFilter = document.getElementById("statusFilter");
+    const refreshBtn = document.getElementById("refreshBtn");
+
+    // Start zoomed out; the map zooms in to the markers once they load
+    const map = L.map("map").setView([20.5937, 78.9629], 5);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map);
+
+    const markerLayer = L.layerGroup().addTo(map);
+    let issues = [];
+
+    function setMessage(text, isError) {
+      message.textContent = text;
+      message.className = isError ? "error" : "";
+    }
+
+    // Builds the popup with textContent so report text can never inject HTML
+    function popupFor(issue) {
+      const box = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = "#" + issue.id + " " + (CATEGORY_LABELS[issue.category] || issue.category);
+      box.appendChild(title);
+
+      [
+        ["Status", issue.status],
+        ["Urgency", issue.urgency],
+        ["Department", issue.department],
+        ["Details", issue.description || "-"],
+      ].forEach(([label, value]) => {
+        const line = document.createElement("div");
+        line.textContent = label + ": " + value;
+        box.appendChild(line);
+      });
+      return box;
+    }
+
+    function render() {
+      markerLayer.clearLayers();
+
+      const filter = statusFilter.value;
+      const located = issues.filter((i) => i.latitude !== null && i.longitude !== null);
+      const visible = located.filter((i) => filter === "all" || i.status === filter);
+
+      visible.forEach((issue) => {
+        L.circleMarker([issue.latitude, issue.longitude], {
+          radius: 10,
+          color: "#ffffff",
+          weight: 2,
+          fillColor: COLORS[issue.status] || "#555555",
+          fillOpacity: 0.9,
+        })
+          .bindPopup(popupFor(issue))
+          .addTo(markerLayer);
+      });
+
+      if (visible.length > 0) {
+        const bounds = L.latLngBounds(visible.map((i) => [i.latitude, i.longitude]));
+        map.fitBounds(bounds.pad(0.3), { maxZoom: 16 });
+      }
+
+      const hidden = issues.length - located.length;
+      let text = visible.length + " issue(s) shown on the map.";
+      if (hidden > 0) text += " " + hidden + " report(s) did not share a location.";
+      if (located.length === 0) text = "No reports with a location yet.";
+      setMessage(text, false);
+    }
+
+    async function loadIssues() {
+      setMessage("Loading...", false);
+      try {
+        const response = await fetch(API + "/issues");
+        if (!response.ok) throw new Error("load failed");
+        issues = await response.json();
+      } catch (error) {
+        issues = [];
+        markerLayer.clearLayers();
+        setMessage("Could not load issues. Check that the backend is running.", true);
+        return;
+      }
+      render();
+    }
+
+    refreshBtn.addEventListener("click", loadIssues);
+    statusFilter.addEventListener("change", render);
+    loadIssues();
+  </script>
+</body>
+</html>
