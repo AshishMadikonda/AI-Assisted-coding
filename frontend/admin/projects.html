@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Projects</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #f4f1ea;
+      color: #20291f;
+    }
+    main { max-width: 1000px; margin: 0 auto; padding: 32px 20px 60px; }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    h2 { margin: 28px 0 12px; font-size: 20px; }
+    .sub { margin: 0 0 20px; color: #5c6656; }
+    form {
+      background: #fff;
+      border: 1px solid #d9d3c2;
+      border-radius: 10px;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .full { grid-column: 1 / -1; }
+    label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #c9bfa3;
+      border-radius: 6px;
+      font: inherit;
+      background: #fff;
+    }
+    textarea { min-height: 70px; resize: vertical; }
+    button {
+      font: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 16px;
+    }
+    #addBtn { background: #2f6e5b; color: #fff; font-weight: 600; }
+    #addBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+    #message { min-height: 20px; margin: 12px 0 0; color: #2f6e5b; font-weight: 600; }
+    #message.error { color: #a8412b; }
+    .tablewrap {
+      overflow-x: auto;
+      background: #fff;
+      border: 1px solid #d9d3c2;
+      border-radius: 10px;
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid #ece7d9; font-size: 14px; vertical-align: top; }
+    th { background: #f0ece0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #5c6656; }
+    tr:last-child td { border-bottom: none; }
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-planned { background: #f6e6c6; color: #8a5a0c; }
+    .status-ongoing { background: #dcebe5; color: #1f4b3e; }
+    .status-completed { background: #e4e4e4; color: #444444; }
+    .start { background: #db9021; color: #fff; }
+    .finish { background: #2f6e5b; color: #fff; }
+    .empty { text-align: center; color: #5c6656; padding: 26px; }
+    .links { margin-top: 22px; }
+    a { color: #2f6e5b; }
+    @media (max-width: 640px) { form { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Manage Projects</h1>
+    <p class="sub">Add upcoming and ongoing public works. Citizens see these on the public projects page.</p>
+
+    <form id="projectForm">
+      <div class="full">
+        <label for="title">Project title</label>
+        <input id="title" maxlength="120" placeholder="For example: New overhead water tank" required>
+      </div>
+      <div>
+        <label for="department">Department</label>
+        <input id="department" placeholder="For example: Water Supply and Drainage Board">
+      </div>
+      <div>
+        <label for="area">Area or ward</label>
+        <input id="area" placeholder="For example: Ward 2">
+      </div>
+      <div class="full">
+        <label for="description">Description</label>
+        <textarea id="description" placeholder="What is being built and who benefits"></textarea>
+      </div>
+      <div>
+        <label for="status">Status</label>
+        <select id="status">
+          <option value="planned">Planned</option>
+          <option value="ongoing">Ongoing</option>
+          <option value="completed">Completed</option>
+        </select>
+      </div>
+      <div></div>
+      <div>
+        <label for="startDate">Start date</label>
+        <input type="date" id="startDate">
+      </div>
+      <div>
+        <label for="endDate">Expected finish date</label>
+        <input type="date" id="endDate">
+      </div>
+      <div class="full">
+        <button type="submit" id="addBtn">Add project</button>
+      </div>
+    </form>
+
+    <p id="message"></p>
+
+    <h2>All projects</h2>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Department</th>
+            <th>Area</th>
+            <th>Status</th>
+            <th>Dates</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <p class="links"><a href="index.html">Back to issues dashboard</a></p>
+  </main>
+
+  <script>
+    const API = "http://127.0.0.1:8000";
+    const STATUS_LABELS = { planned: "Planned", ongoing: "Ongoing", completed: "Completed" };
+
+    const form = document.getElementById("projectForm");
+    const addBtn = document.getElementById("addBtn");
+    const message = document.getElementById("message");
+    const rows = document.getElementById("rows");
+
+    let projects = [];
+
+    function setMessage(text, isError) {
+      message.textContent = text;
+      message.className = isError ? "error" : "";
+    }
+
+    function formatDate(value) {
+      if (!value) return "-";
+      const date = new Date(value + "T00:00:00");
+      return isNaN(date) ? value : date.toLocaleDateString();
+    }
+
+    function makeCell(text) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      return td;
+    }
+
+    function makeActionCell(project) {
+      const td = document.createElement("td");
+      if (project.status === "planned") {
+        const btn = document.createElement("button");
+        btn.className = "start";
+        btn.textContent = "Mark ongoing";
+        btn.addEventListener("click", () => changeStatus(project.id, "ongoing"));
+        td.appendChild(btn);
+      } else if (project.status === "ongoing") {
+        const btn = document.createElement("button");
+        btn.className = "finish";
+        btn.textContent = "Mark completed";
+        btn.addEventListener("click", () => changeStatus(project.id, "completed"));
+        td.appendChild(btn);
+      } else {
+        td.textContent = "Done";
+      }
+      return td;
+    }
+
+    function render() {
+      rows.innerHTML = "";
+      if (projects.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 7;
+        td.className = "empty";
+        td.textContent = "No projects yet. Add the first one above.";
+        tr.appendChild(td);
+        rows.appendChild(tr);
+        return;
+      }
+
+      projects.forEach((project) => {
+        const tr = document.createElement("tr");
+        tr.appendChild(makeCell("#" + project.id));
+        tr.appendChild(makeCell(project.title));
+        tr.appendChild(makeCell(project.department || "-"));
+        tr.appendChild(makeCell(project.area || "-"));
+
+        const statusCell = document.createElement("td");
+        const badge = document.createElement("span");
+        badge.className = "badge status-" + project.status;
+        badge.textContent = STATUS_LABELS[project.status] || project.status;
+        statusCell.appendChild(badge);
+        tr.appendChild(statusCell);
+
+        tr.appendChild(
+          makeCell(formatDate(project.start_date) + " to " + formatDate(project.expected_end_date))
+        );
+        tr.appendChild(makeActionCell(project));
+        rows.appendChild(tr);
+      });
+    }
+
+    async function loadProjects() {
+      try {
+        const response = await fetch(API + "/projects");
+        if (!response.ok) throw new Error("load failed");
+        projects = await response.json();
+      } catch (error) {
+        projects = [];
+        setMessage("Could not load projects. Check that the backend is running.", true);
+      }
+      render();
+    }
+
+    async function changeStatus(id, status) {
+      try {
+        const response = await fetch(API + "/projects/" + id + "/status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: status }),
+        });
+        if (!response.ok) throw new Error("update failed");
+        setMessage("", false);
+        await loadProjects();
+      } catch (error) {
+        setMessage("Could not update the project. Check that the backend is running.", true);
+      }
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      addBtn.disabled = true;
+      setMessage("Adding...", false);
+
+      const body = {
+        title: document.getElementById("title").value.trim(),
+        department: document.getElementById("department").value.trim(),
+        area: document.getElementById("area").value.trim(),
+        description: document.getElementById("description").value.trim(),
+        status: document.getElementById("status").value,
+        start_date: document.getElementById("startDate").value || null,
+        expected_end_date: document.getElementById("endDate").value || null,
+      };
+
+      try {
+        const response = await fetch(API + "/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!response.ok) throw new Error("add failed");
+        form.reset();
+        setMessage("Project added.", false);
+        await loadProjects();
+      } catch (error) {
+        setMessage("Could not add the project. Check the fields and that the backend is running.", true);
+      }
+      addBtn.disabled = false;
+    });
+
+    loadProjects();
+  </script>
+</body>
+</html>
