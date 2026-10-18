@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Lets this file import code from the /ai folder at the project root
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -36,6 +36,7 @@ CATEGORIES = [
     "streetlight",
 ]
 STATUSES = ["reported", "assigned", "resolved"]
+PROJECT_STATUSES = ["planned", "ongoing", "completed"]
 
 # Sample department names. Replace them with your local panchayat or municipality departments.
 DEPARTMENTS = {
@@ -71,10 +72,26 @@ def init_db():
         )
         """
     )
-    # Databases created before this step do not have the note column yet, so add it
+    # Databases created before the note column existed need it added
     columns = [row["name"] for row in conn.execute("PRAGMA table_info(issues)").fetchall()]
     if "resolution_note" not in columns:
         conn.execute("ALTER TABLE issues ADD COLUMN resolution_note TEXT")
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            department TEXT,
+            area TEXT,
+            description TEXT,
+            status TEXT DEFAULT 'planned',
+            start_date TEXT,
+            expected_end_date TEXT,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()
     conn.close()
 
@@ -88,6 +105,17 @@ def add_department(row):
     return issue
 
 
+def clean_date(value):
+    # Accepts an empty value or a date written like 2026-12-31
+    if not value:
+        return None
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Dates must look like 2026-12-31")
+    return value
+
+
 class IssueCreate(BaseModel):
     category: str
     description: str = ""
@@ -99,6 +127,20 @@ class IssueCreate(BaseModel):
 class StatusUpdate(BaseModel):
     status: str
     note: Optional[str] = None
+
+
+class ProjectCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    department: str = ""
+    area: str = ""
+    description: str = ""
+    status: str = "planned"
+    start_date: Optional[str] = None
+    expected_end_date: Optional[str] = None
+
+
+class ProjectStatusUpdate(BaseModel):
+    status: str
 
 
 @app.get("/")
@@ -199,3 +241,60 @@ def update_status(issue_id: int, update: StatusUpdate):
     if cursor.rowcount == 0:
         raise HTTPException(status_code=404, detail="Issue not found")
     return {"id": issue_id, "status": update.status, "note": update.note}
+
+
+@app.get("/projects")
+def list_projects(status: Optional[str] = None):
+    if status is not None and status not in PROJECT_STATUSES:
+        raise HTTPException(status_code=400, detail=f"status must be one of {PROJECT_STATUSES}")
+    conn = get_connection()
+    if status:
+        rows = conn.execute(
+            "SELECT * FROM projects WHERE status = ? ORDER BY id DESC", (status,)
+        ).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM projects ORDER BY id DESC").fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+@app.post("/projects")
+def create_project(project: ProjectCreate):
+    if project.status not in PROJECT_STATUSES:
+        raise HTTPException(status_code=400, detail=f"status must be one of {PROJECT_STATUSES}")
+    start_date = clean_date(project.start_date)
+    end_date = clean_date(project.expected_end_date)
+    conn = get_connection()
+    cursor = conn.execute(
+        "INSERT INTO projects (title, department, area, description, status, "
+        "start_date, expected_end_date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            project.title.strip(),
+            project.department,
+            project.area,
+            project.description,
+            project.status,
+            start_date,
+            end_date,
+            datetime.now().isoformat(),
+        ),
+    )
+    conn.commit()
+    new_id = cursor.lastrowid
+    conn.close()
+    return {"id": new_id, "message": "Project added", "status": project.status}
+
+
+@app.patch("/projects/{project_id}/status")
+def update_project_status(project_id: int, update: ProjectStatusUpdate):
+    if update.status not in PROJECT_STATUSES:
+        raise HTTPException(status_code=400, detail=f"status must be one of {PROJECT_STATUSES}")
+    conn = get_connection()
+    cursor = conn.execute(
+        "UPDATE projects SET status = ? WHERE id = ?", (update.status, project_id)
+    )
+    conn.commit()
+    conn.close()
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {"id": project_id, "status": update.status}
