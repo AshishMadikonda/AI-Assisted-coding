@@ -37,6 +37,16 @@ CATEGORIES = [
 ]
 STATUSES = ["reported", "assigned", "resolved"]
 
+# Sample department names. Replace them with your local panchayat or municipality departments.
+DEPARTMENTS = {
+    "road_damage": "Roads and Highways Department",
+    "water_drainage": "Water Supply and Drainage Board",
+    "electricity": "Electricity Board",
+    "sanitation": "Sanitation Department",
+    "mosquito_breeding": "Public Health Department",
+    "streetlight": "Street Lighting Department",
+}
+
 
 def get_connection():
     conn = sqlite3.connect(DB_FILE)
@@ -67,6 +77,12 @@ def init_db():
 init_db()
 
 
+def add_department(row):
+    issue = dict(row)
+    issue["department"] = DEPARTMENTS.get(issue["category"], "Unassigned")
+    return issue
+
+
 class IssueCreate(BaseModel):
     category: str
     description: str = ""
@@ -82,6 +98,11 @@ class StatusUpdate(BaseModel):
 @app.get("/")
 def home():
     return {"status": "ok", "message": "Civic Issue backend running"}
+
+
+@app.get("/departments")
+def list_departments():
+    return DEPARTMENTS
 
 
 @app.post("/classify")
@@ -127,7 +148,12 @@ def create_issue(issue: IssueCreate):
     conn.commit()
     new_id = cursor.lastrowid
     conn.close()
-    return {"id": new_id, "message": "Issue reported", "status": "reported"}
+    return {
+        "id": new_id,
+        "message": "Issue reported",
+        "status": "reported",
+        "department": DEPARTMENTS[issue.category],
+    }
 
 
 @app.get("/issues")
@@ -135,7 +161,7 @@ def list_issues():
     conn = get_connection()
     rows = conn.execute("SELECT * FROM issues ORDER BY id DESC").fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+    return [add_department(row) for row in rows]
 
 
 @app.get("/issues/{issue_id}")
@@ -145,7 +171,7 @@ def get_issue(issue_id: int):
     conn.close()
     if row is None:
         raise HTTPException(status_code=404, detail="Issue not found")
-    return dict(row)
+    return add_department(row)
 
 
 @app.patch("/issues/{issue_id}/status")
