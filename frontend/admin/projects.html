@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Manage Projects</title>
+  <script src="auth.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -139,7 +140,7 @@
       </table>
     </div>
 
-    <p class="links"><a href="index.html">Back to issues dashboard</a></p>
+    <p class="links"><a href="index.html">Back to issues dashboard</a> &middot; <a href="#" onclick="adminLogout(); return false;">Log out</a>
   </main>
 
   <script>
@@ -239,7 +240,7 @@
 
     async function changeStatus(id, status) {
       try {
-        const response = await fetch(API + "/projects/" + id + "/status", {
+        const response = await adminFetch(API + "/projects/" + id + "/status", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: status }),
@@ -268,7 +269,7 @@
       };
 
       try {
-        const response = await fetch(API + "/projects", {
+        const response = await adminFetch(API + "/projects", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
