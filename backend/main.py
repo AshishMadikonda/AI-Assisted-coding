@@ -1,3 +1,4 @@
+import hmac
 import os
 import shutil
 import sqlite3
@@ -6,7 +7,8 @@ import tempfile
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -14,6 +16,9 @@ from pydantic import BaseModel, Field
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(ROOT_DIR)
 from ai.classify import classify_issue  # noqa: E402
+
+# Reads GEMINI_API_KEY and ADMIN_KEY from the .env file in the project root
+load_dotenv(os.path.join(ROOT_DIR, ".env"))
 
 app = FastAPI(title="Civic Issue API")
 
@@ -47,6 +52,17 @@ DEPARTMENTS = {
     "mosquito_breeding": "Public Health Department",
     "streetlight": "Street Lighting Department",
 }
+
+
+def require_admin(x_admin_key: Optional[str] = Header(default=None)):
+    """Blocks a request unless it carries the correct X-Admin-Key header."""
+    expected = os.getenv("ADMIN_KEY", "")
+    if not expected:
+        # Fail closed: if no key is configured, nobody gets admin access
+        raise HTTPException(status_code=503, detail="ADMIN_KEY is not set on the server")
+    given = x_admin_key or ""
+    if not hmac.compare_digest(given.encode("utf-8"), expected.encode("utf-8")):
+        raise HTTPException(status_code=401, detail="Missing or wrong admin key")
 
 
 def get_connection():
@@ -148,6 +164,12 @@ def home():
     return {"status": "ok", "message": "Civic Issue backend running"}
 
 
+@app.get("/admin/check", dependencies=[Depends(require_admin)])
+def admin_check():
+    # The admin pages call this to find out whether the key they were given is correct
+    return {"ok": True}
+
+
 @app.get("/departments")
 def list_departments():
     return DEPARTMENTS
@@ -222,7 +244,7 @@ def get_issue(issue_id: int):
     return add_department(row)
 
 
-@app.patch("/issues/{issue_id}/status")
+@app.patch("/issues/{issue_id}/status", dependencies=[Depends(require_admin)])
 def update_status(issue_id: int, update: StatusUpdate):
     if update.status not in STATUSES:
         raise HTTPException(status_code=400, detail=f"status must be one of {STATUSES}")
@@ -258,7 +280,7 @@ def list_projects(status: Optional[str] = None):
     return [dict(row) for row in rows]
 
 
-@app.post("/projects")
+@app.post("/projects", dependencies=[Depends(require_admin)])
 def create_project(project: ProjectCreate):
     if project.status not in PROJECT_STATUSES:
         raise HTTPException(status_code=400, detail=f"status must be one of {PROJECT_STATUSES}")
@@ -285,7 +307,7 @@ def create_project(project: ProjectCreate):
     return {"id": new_id, "message": "Project added", "status": project.status}
 
 
-@app.patch("/projects/{project_id}/status")
+@app.patch("/projects/{project_id}/status", dependencies=[Depends(require_admin)])
 def update_project_status(project_id: int, update: ProjectStatusUpdate):
     if update.status not in PROJECT_STATUSES:
         raise HTTPException(status_code=400, detail=f"status must be one of {PROJECT_STATUSES}")
