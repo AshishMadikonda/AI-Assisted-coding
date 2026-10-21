@@ -10,6 +10,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 # Lets this file import code from the /ai folder at the project root
@@ -30,7 +31,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DB_FILE = "issues.db"
+DB_FILE = os.getenv("DB_FILE", "issues.db")
 
 CATEGORIES = [
     "road_damage",
@@ -320,3 +321,22 @@ def update_project_status(project_id: int, update: ProjectStatusUpdate):
     if cursor.rowcount == 0:
         raise HTTPException(status_code=404, detail="Project not found")
     return {"id": project_id, "status": update.status}
+
+
+# ---------- Web pages ----------
+# Serve the citizen and admin pages from the same FastAPI server.
+FRONTEND_DIR = os.path.join(ROOT_DIR, "frontend")
+
+if os.path.isdir(os.path.join(FRONTEND_DIR, "citizen")):
+    app.mount(
+        "/citizen",
+        StaticFiles(directory=os.path.join(FRONTEND_DIR, "citizen"), html=True),
+        name="citizen",
+    )
+
+if os.path.isdir(os.path.join(FRONTEND_DIR, "admin")):
+    app.mount(
+        "/admin-ui",
+        StaticFiles(directory=os.path.join(FRONTEND_DIR, "admin"), html=True),
+        name="admin-ui",
+    )
