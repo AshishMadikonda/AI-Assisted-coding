@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard</title>
+<script src="auth.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -87,9 +88,12 @@
     <div class="top">
       <div>
         <h1>Admin Dashboard</h1>
-        <p class="sub">Reported civic issues. Assign them and mark them resolved.</p>
+        <p class="sub">Reported civic issues. Assign them and mark them resolved. <a href="projects.html">Manage projects</a></p>
       </div>
-      <button id="refreshBtn">Refresh</button>
+      <div>
+  <button id="refreshBtn">Refresh</button>
+  <button type="button" style="background:#e4dcc8;color:#20291f" onclick="adminLogout()">Log out</button>
+</div>
     </div>
 
     <section class="stats">
@@ -285,7 +289,7 @@
       const body = { status: status };
       if (note !== undefined) body.note = note;
       try {
-        const response = await fetch(API + "/issues/" + id + "/status", {
+        const response = await adminFetch(API + "/issues/" + id + "/status", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
