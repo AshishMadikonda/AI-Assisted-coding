@@ -1,80 +1,245 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Report a Civic Issue</title>
+  <title>Report a Civic Issue | CivicIssues</title>
+
   <style>
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       background: #f4f1ea;
       color: #20291f;
     }
+
+    header {
+      background: #fff;
+      border-bottom: 1px solid #d9d3c2;
+      padding: 16px 20px;
+    }
+
+    nav {
+      max-width: 900px;
+      margin: auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    nav a {
+      color: #20291f;
+      text-decoration: none;
+      font-size: 14px;
+      padding: 7px 0;
+    }
+
+    nav a:hover {
+      color: #2f6e5b;
+      text-decoration: underline;
+    }
+
+    nav a.active {
+      color: #2f6e5b;
+      font-weight: 700;
+    }
+
     main {
-      max-width: 560px;
+      max-width: 600px;
       margin: 0 auto;
       padding: 32px 20px 60px;
     }
-    h1 { margin: 0 0 6px; font-size: 28px; }
-    .sub { margin: 0 0 24px; color: #5c6656; }
+
+    .eyebrow {
+      color: #2f6e5b;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(28px, 5vw, 36px);
+      line-height: 1.2;
+    }
+
+    .sub {
+      margin: 0 0 24px;
+      color: #5c6656;
+      line-height: 1.6;
+    }
+
     form {
       background: #fff;
       border: 1px solid #d9d3c2;
-      border-radius: 10px;
+      border-radius: 14px;
       padding: 22px;
+      box-shadow: 0 8px 28px rgba(32, 41, 31, 0.04);
     }
-    label { display: block; margin: 16px 0 6px; font-weight: 600; font-size: 14px; }
-    label:first-of-type { margin-top: 0; }
-    input[type="file"], select, textarea {
+
+    label {
+      display: block;
+      margin: 18px 0 7px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    label:first-of-type {
+      margin-top: 0;
+    }
+
+    input[type="file"],
+    select,
+    textarea {
       width: 100%;
-      padding: 10px;
+      padding: 12px;
       border: 1px solid #c9bfa3;
-      border-radius: 6px;
+      border-radius: 8px;
       font: inherit;
       background: #fff;
+      color: #20291f;
     }
-    textarea { min-height: 80px; resize: vertical; }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: 2px solid #2f6e5b;
+      outline-offset: 1px;
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
     #preview {
       display: none;
       width: 100%;
-      max-height: 260px;
+      max-height: 280px;
       object-fit: cover;
-      border-radius: 6px;
-      margin-top: 10px;
+      border-radius: 8px;
+      margin-top: 12px;
     }
-    .note { margin: 8px 0 0; font-size: 13px; color: #2f6e5b; min-height: 18px; }
+
+    .note {
+      margin: 8px 0 0;
+      font-size: 13px;
+      color: #2f6e5b;
+      line-height: 1.5;
+      min-height: 18px;
+    }
+
     button {
       font: inherit;
       cursor: pointer;
-      border-radius: 6px;
-      padding: 11px 18px;
+      border-radius: 8px;
+      padding: 12px 18px;
       border: none;
     }
-    #locBtn { background: #e4dcc8; color: #20291f; }
+
+    #locBtn {
+      background: #e4dcc8;
+      color: #20291f;
+    }
+
+    #locBtn:hover {
+      background: #d9ceb4;
+    }
+
     #submitBtn {
       width: 100%;
       margin-top: 22px;
       background: #2f6e5b;
       color: #fff;
-      font-weight: 600;
+      font-weight: 700;
     }
-    #submitBtn:disabled { opacity: 0.6; cursor: not-allowed; }
-    #result { margin-top: 18px; font-weight: 600; color: #1f4b3e; }
-    #result.error { color: #a8412b; }
+
+    #submitBtn:hover:not(:disabled) {
+      background: #245645;
+    }
+
+    #submitBtn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #result {
+      margin-top: 18px;
+      font-weight: 600;
+      line-height: 1.6;
+      color: #1f4b3e;
+      overflow-wrap: anywhere;
+    }
+
+    #result.error {
+      color: #a8412b;
+    }
+
+    .privacy-note {
+      margin-top: 18px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #687061;
+      text-align: center;
+    }
+
+    @media (max-width: 480px) {
+      nav {
+        gap: 10px 16px;
+      }
+
+      form {
+        padding: 18px;
+      }
+
+      main {
+        padding-top: 26px;
+      }
+    }
   </style>
 </head>
+
 <body>
+  <!-- Navigation -->
+  <header>
+    <nav aria-label="Main navigation">
+      <a href="index.html" class="active">Report an issue</a>
+      <a href="track.html">Track a report</a>
+      <a href="map.html">Issue map</a>
+      <a href="projects.html">Public projects</a>
+    </nav>
+  </header>
+
+  <!-- Main report page -->
   <main>
+    <p class="eyebrow">CivicIssues· Your community matters</p>
+
     <h1>Report a Civic Issue</h1>
-    <p class="sub">Take a photo. We identify the problem and send it to the right department.</p>
+
+    <p class="sub">
+      See a problem in your area? Upload a photo, let AI suggest the issue type,
+      and submit a report to help your community.
+    </p>
 
     <form id="reportForm">
-      <label for="photo">Photo</label>
-      <input type="file" id="photo" accept="image/jpeg,image/png" required>
-      <img id="preview" alt="Preview of your photo">
-      <p class="note" id="aiStatus"></p>
+      <label for="photo">Photo of the issue</label>
+      <input
+        type="file"
+        id="photo"
+        accept="image/jpeg,image/png"
+        required
+      >
+
+      <img id="preview" alt="Preview of your selected issue photo">
+
+      <p class="note" id="aiStatus" aria-live="polite"></p>
 
       <label for="category">Issue type</label>
       <select id="category" required>
@@ -88,27 +253,40 @@
       </select>
 
       <label for="urgency">Urgency</label>
-      <select id="urgency">
+      <select id="urgency" required>
         <option value="low">Low</option>
         <option value="medium" selected>Medium</option>
         <option value="high">High</option>
       </select>
 
       <label for="description">Description</label>
-      <textarea id="description" placeholder="Describe the problem"></textarea>
+      <textarea
+        id="description"
+        placeholder="Describe where the problem is and what happened"
+      ></textarea>
 
       <label>Location</label>
+
       <button type="button" id="locBtn">Use my location</button>
-      <p class="note" id="locStatus"></p>
+
+      <p class="note" id="locStatus" aria-live="polite">
+        Location is optional, but it helps identify the issue's area.
+      </p>
 
       <button type="submit" id="submitBtn">Submit report</button>
     </form>
 
-    <p id="result"></p>
+    <p id="result" role="status" aria-live="polite"></p>
+
+    <p class="privacy-note">
+      Please avoid including faces or other personal information in uploaded photos.
+    </p>
   </main>
 
   <script>
-    const API = "http://127.0.0.1:8000";
+    // Use the same origin as the page so local testing and deployment
+    // can use the same backend URL.
+    const API = window.location.origin;
 
     const form = document.getElementById("reportForm");
     const photoInput = document.getElementById("photo");
@@ -124,92 +302,186 @@
 
     let latitude = null;
     let longitude = null;
+    let currentPreviewUrl = null;
 
-    // 1. When a photo is chosen: show it, then ask the AI to classify it
+    // 1. Preview the selected photo and ask the AI to classify it.
     photoInput.addEventListener("change", async () => {
       const file = photoInput.files[0];
+
       if (!file) return;
 
-      preview.src = URL.createObjectURL(file);
+      if (!["image/jpeg", "image/png"].includes(file.type)) {
+        photoInput.value = "";
+        aiStatus.textContent = "Please choose a JPG, JPEG, or PNG image.";
+        return;
+      }
+
+      if (currentPreviewUrl) {
+        URL.revokeObjectURL(currentPreviewUrl);
+      }
+
+      currentPreviewUrl = URL.createObjectURL(file);
+      preview.src = currentPreviewUrl;
       preview.style.display = "block";
+
       aiStatus.textContent = "Analysing your photo with AI...";
 
       const data = new FormData();
       data.append("photo", file);
 
       try {
-        const response = await fetch(API + "/classify", { method: "POST", body: data });
-        if (!response.ok) throw new Error("classify failed");
+        const response = await fetch(API + "/classify", {
+          method: "POST",
+          body: data
+        });
+
+        if (!response.ok) {
+          throw new Error("AI classification failed");
+        }
+
         const ai = await response.json();
 
         if (ai.category && ai.category !== "unknown") {
           categorySelect.value = ai.category;
-          aiStatus.textContent = "AI suggestion filled in below. You can change it.";
+
+          if (categorySelect.value !== ai.category) {
+            aiStatus.textContent =
+              "AI returned an unrecognised issue type. Please choose one below.";
+          } else {
+            aiStatus.textContent =
+              "AI suggestion filled in below. You can change it.";
+          }
         } else {
           categorySelect.value = "";
-          aiStatus.textContent = "AI could not identify the problem. Please choose the type yourself.";
+          aiStatus.textContent =
+            "AI could not identify the issue. Please choose the type yourself.";
         }
-        urgencySelect.value = ai.urgency || "medium";
-        if (!descriptionBox.value) descriptionBox.value = ai.description || "";
+
+        if (["low", "medium", "high"].includes(ai.urgency)) {
+          urgencySelect.value = ai.urgency;
+        }
+
+        if (!descriptionBox.value.trim() && ai.description) {
+          descriptionBox.value = ai.description;
+        }
       } catch (error) {
-        aiStatus.textContent = "AI is unavailable right now. Please choose the type yourself.";
+        console.error("Classification error:", error);
+
+        aiStatus.textContent =
+          "AI is unavailable right now. Please choose the issue type yourself.";
       }
     });
 
-    // 2. Capture the user's location
+    // 2. Capture the user's location, if they give permission.
     locBtn.addEventListener("click", () => {
       if (!navigator.geolocation) {
-        locStatus.textContent = "Location is not supported in this browser.";
+        locStatus.textContent =
+          "Location is not supported by this browser.";
         return;
       }
+
       locStatus.textContent = "Getting your location...";
+      locBtn.disabled = true;
+
       navigator.geolocation.getCurrentPosition(
         (position) => {
           latitude = position.coords.latitude;
           longitude = position.coords.longitude;
+
           locStatus.textContent =
-            "Location captured (" + latitude.toFixed(4) + ", " + longitude.toFixed(4) + ")";
+            "Location captured (" +
+            latitude.toFixed(4) +
+            ", " +
+            longitude.toFixed(4) +
+            ").";
+
+          locBtn.disabled = false;
         },
-        () => {
-          locStatus.textContent = "Could not get your location. You can still submit.";
+        (error) => {
+          console.error("Location error:", error);
+
+          locStatus.textContent =
+            "Could not get your location. Check browser permission or continue without it.";
+
+          locBtn.disabled = false;
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 60000
         }
       );
     });
 
-    // 3. Submit the report to the backend
+    // 3. Submit the report to the backend.
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
+
+      if (!form.reportValidity()) return;
+
+      if (!categorySelect.value) {
+        result.className = "error";
+        result.textContent = "Please select an issue type.";
+        categorySelect.focus();
+        return;
+      }
+
       submitBtn.disabled = true;
       result.className = "";
-      result.textContent = "Submitting...";
+      result.textContent = "Submitting your report...";
 
       try {
         const response = await fetch(API + "/issues", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json"
+          },
           body: JSON.stringify({
             category: categorySelect.value,
-            description: descriptionBox.value,
+            description: descriptionBox.value.trim(),
             urgency: urgencySelect.value,
             latitude: latitude,
-            longitude: longitude,
-          }),
+            longitude: longitude
+          })
         });
-        if (!response.ok) throw new Error("submit failed");
+
+        if (!response.ok) {
+          const message = await response.text();
+          throw new Error(message || "Report submission failed");
+        }
+
         const data = await response.json();
 
-        result.textContent = "Report submitted. Your issue number is #" + data.id + ".";
+        result.textContent =
+          "Report submitted successfully. Your issue number is #" +
+          data.id +
+          ".";
+
         form.reset();
+
         preview.style.display = "none";
+        preview.removeAttribute("src");
+
+        if (currentPreviewUrl) {
+          URL.revokeObjectURL(currentPreviewUrl);
+          currentPreviewUrl = null;
+        }
+
         aiStatus.textContent = "";
-        locStatus.textContent = "";
+        locStatus.textContent =
+          "Location is optional, but it helps identify the issue's area.";
+
         latitude = null;
         longitude = null;
       } catch (error) {
+        console.error("Report submission error:", error);
+
         result.className = "error";
-        result.textContent = "Could not submit. Check that the backend is running.";
+        result.textContent =
+          "Could not submit the report. Check that the backend is running and try again.";
+      } finally {
+        submitBtn.disabled = false;
       }
-      submitBtn.disabled = false;
     });
   </script>
 </body>
