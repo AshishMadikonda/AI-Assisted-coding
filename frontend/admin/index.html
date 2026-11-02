@@ -135,6 +135,7 @@
     </div>
   </main>
 
+    <script src="auth.js"></script>
   <script>
     const API = "http://127.0.0.1:8000";
 
@@ -301,9 +302,39 @@
       }
     }
 
-    refreshBtn.addEventListener("click", loadIssues);
+    
+    async function authenticateAdmin() {
+      let key = getAdminKey();
+
+      if (!key) {
+        key = prompt("Enter your admin key:");
+        if (!key || !key.trim()) {
+          setMessage("Admin key is required to manage issues.", true);
+          return;
+        }
+        setAdminKey(key.trim());
+      }
+
+      try {
+        const response = await adminFetch(API + "/admin/check");
+
+        if (!response.ok) {
+          clearAdminKey();
+          setMessage("Admin authentication failed. Refresh and enter the correct key.", true);
+          return;
+        }
+
+        setMessage("Admin authenticated.", false);
+        await loadIssues();
+      } catch (error) {
+        setMessage("Could not verify admin access. Check that the backend is running.", true);
+      }
+    }
+
+    refreshBtn.addEventListener("click", authenticateAdmin);
     statusFilter.addEventListener("change", render);
-    loadIssues();
+    authenticateAdmin();
+
   </script>
 </body>
 </html>

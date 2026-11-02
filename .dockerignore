@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+.venv
+venv
+__pycache__
+*.pyc
+*.db
+.pytest_cache
+ai/sample-images
+backend/tests
+backend/requirements-dev.txt
+docs
+data
+README.md
