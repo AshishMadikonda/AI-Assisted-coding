@@ -9,11 +9,12 @@ from google import genai
 from google.genai import types
 
 
-# Find the project root and load its .env file
+# Find the project root and load its .env file if available
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = PROJECT_ROOT / ".env"
 
-load_dotenv(dotenv_path=ENV_FILE, override=True)
+# Do not overwrite environment variables already provided by Docker
+load_dotenv(dotenv_path=ENV_FILE, override=False)
 
 MODEL = "gemini-3.5-flash-lite"
 
@@ -49,19 +50,15 @@ Do not invent details that are not visible in the image.
 
 
 def classify_issue(image_path):
-    # Check whether the expected environment file exists
-    if not ENV_FILE.is_file():
-        raise RuntimeError(
-            f".env file not found at: {ENV_FILE}"
-        )
 
-    # Read the API key without displaying it
+    # Read the API key from the environment
+    # Works with both local .env and Docker Compose env_file
     api_key = os.getenv("GEMINI_API_KEY")
 
     if not api_key or not api_key.strip():
         raise RuntimeError(
             "GEMINI_API_KEY is missing or empty. "
-            "Check the .env file in your project root."
+            "Check your project-root .env file or Docker environment."
         )
 
     # Resolve and validate the image path
